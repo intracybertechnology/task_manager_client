@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   CalendarDays,
+  CalendarCheck,
   UserX,
 } from 'lucide-react';
 
@@ -145,6 +146,57 @@ export default function AdminDashboardPage() {
             </span>
           </div>
         </div>
+      </div>
+
+      {/* Attendance today */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+            <CalendarCheck className="w-4 h-4 text-emerald-600" /> Attendance Today
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+              cutoff {stats?.attendance_today?.cutoff || '11:55'}
+            </span>
+          </h3>
+          <Link
+            to="/admin/attendance"
+            className="text-[11px] font-semibold text-brand hover:text-brand-dark"
+          >
+            Open attendance board →
+          </Link>
+        </div>
+
+        {stats?.attendance_today?.is_off_day ? (
+          <p className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-xl p-3">
+            Today ({stats.attendance_today.date}) is a company off day. Attendance is not marked today.
+          </p>
+        ) : (
+          <>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: 'Present', value: stats?.attendance_today?.counts?.present || 0, cls: 'text-emerald-600' },
+                { label: 'Not yet', value: stats?.attendance_today?.counts?.not_yet || 0, cls: 'text-slate-700' },
+                { label: 'Absent', value: stats?.attendance_today?.counts?.absent || 0, cls: 'text-red-600' },
+              ].map((c) => (
+                <div key={c.label} className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-center">
+                  <p className={`text-2xl font-black ${c.cls}`}>{c.value}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-0.5">{c.label}</p>
+                </div>
+              ))}
+            </div>
+            {stats?.attendance_today?.absent?.length > 0 && (
+              <p className="text-[11px] text-slate-500 mt-3">
+                <span className="font-semibold text-red-600">Absent: </span>
+                {stats.attendance_today.absent.map((a) => a.name).join(', ')}
+              </p>
+            )}
+            {stats?.attendance_today?.present?.length > 0 && (
+              <p className="text-[11px] text-slate-500 mt-1">
+                <span className="font-semibold text-emerald-700">Present: </span>
+                {stats.attendance_today.present.map((a) => a.name).join(', ')}
+              </p>
+            )}
+          </>
+        )}
       </div>
 
       {/* Submission Tracking — Submitted & Pending panels */}

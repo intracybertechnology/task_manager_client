@@ -108,6 +108,11 @@ export const projectApi = {
 };
 
 export const attendanceApi = {
+  // Self-service (employees and managers)
+  getMyToday: () => api.get('/attendance/me/today'),
+  markMe: () => api.post('/attendance/me/mark'),
+  getTodayBoard: () => api.get('/attendance/today'),
+  setStatus: (data) => api.patch('/attendance/status', data),
   // Company off days
   getOffDays: (params) => api.get('/attendance/off-days', { params }),
   addOffDay: (data) => api.post('/attendance/off-days', data),

@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { notify } from '../ui/feedback';
 import { Modal } from '../ui/dialog';
+import AttendanceMarkButton from '../ui/attendance-mark-button';
 import {
   CheckSquare,
   Clock,
@@ -473,6 +474,7 @@ export default function AppLayout() {
           </div>
 
           <div className="flex items-center gap-2 min-w-0">
+            <AttendanceMarkButton />
             <span className="hidden md:inline text-xs text-slate-500">Signed in as:</span>
             <span className="text-xs font-semibold text-slate-800 truncate">{user?.email}</span>
           </div>

@@ -5,6 +5,7 @@ import { attendanceApi, adminApi } from '../../lib/api';
 import { localDateStr } from '../../lib/utils';
 import {
   CalendarDays,
+  CalendarCheck,
   Plus,
   Trash2,
   X,
@@ -50,7 +51,50 @@ const currentYearMonth = () => {
 };
 
 export default function AdminAttendancePage() {
-  const [activeTab, setActiveTab] = useState('offdays'); // 'offdays' | 'absences'
+  const [activeTab, setActiveTab] = useState('today'); // 'today' | 'offdays' | 'absences'
+
+  // Today's presence board
+  const [board, setBoard] = useState(null);
+  const [boardLoading, setBoardLoading] = useState(true);
+  const [savingStatus, setSavingStatus] = useState(null);
+
+  const loadBoard = useCallback(async () => {
+    try {
+      const res = await attendanceApi.getTodayBoard();
+      setBoard(res.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setBoardLoading(false);
+    }
+  }, []);
+
+  const handleSetStatus = async (person, status) => {
+    if (status === person.status) return;
+
+    const label = (s) => s.replace('_', ' ').toLowerCase();
+    const confirmed = await confirmDialog(
+      `Change ${person.first_name} ${person.last_name} from ${label(person.status)} to ${label(status)}? This is recorded in the audit log.`
+    );
+    if (!confirmed) return;
+
+    try {
+      setSavingStatus(person.id);
+      await attendanceApi.setStatus({ employee_id: person.id, date: board.date, status });
+      notify.success(`${person.first_name} ${person.last_name} set to ${label(status)}.`);
+      await loadBoard();
+    } catch (err) {
+      notify.error(err.message);
+    } finally {
+      setSavingStatus(null);
+    }
+  };
+
+  useEffect(() => {
+    loadBoard();
+    const timer = setInterval(loadBoard, 30000);
+    return () => clearInterval(timer);
+  }, [loadBoard]);
 
   // Off days state
   const [offDays, setOffDays] = useState([]);
@@ -221,6 +265,7 @@ export default function AdminAttendancePage() {
       {/* Tabs */}
       <div className="flex border-b border-slate-200">
         {[
+          { id: 'today', label: "Today's Attendance", icon: <CalendarCheck className="w-4 h-4" /> },
           { id: 'offdays', label: 'Company Off Days', icon: <SunMedium className="w-4 h-4" /> },
           { id: 'absences', label: 'Individual Absences', icon: <UserX className="w-4 h-4" /> },
         ].map((tab) => (
@@ -238,6 +283,156 @@ export default function AdminAttendancePage() {
           </button>
         ))}
       </div>
+
+      {/* ── Tab: Today's Attendance ───────────────────────────────────────── */}
+      {activeTab === 'today' && (
+        <div className="space-y-4">
+          {boardLoading ? (
+            <LoadingSkeleton />
+          ) : !board ? (
+            <div className="bg-white rounded-xl border border-dashed border-slate-200 p-10 text-center text-sm text-slate-500">
+              Could not load today's attendance.
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <span className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
+                    Present: {board.counts.present}
+                  </span>
+                  <span className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 border border-slate-200 font-semibold">
+                    Not yet: {board.counts.not_yet}
+                  </span>
+                  <span className="px-3 py-1.5 rounded-lg bg-red-50 text-red-700 border border-red-200 font-semibold">
+                    Absent: {board.counts.absent}
+                  </span>
+                  {board.counts.other > 0 && (
+                    <span className="px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 font-semibold">
+                      Leave / Off / Half: {board.counts.other}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <CalendarDays className="w-4 h-4" />
+                  {board.date}
+                  <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 font-semibold text-slate-600">
+                    cutoff {board.cutoff}
+                  </span>
+                  {board.is_off_day && (
+                    <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 font-semibold text-slate-600">
+                      Off day
+                    </span>
+                  )}
+                  <button
+                    onClick={loadBoard}
+                    className="p-1.5 text-slate-500 hover:text-brand transition"
+                    title="Refresh"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {board.is_off_day ? (
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-center">
+                  <SunMedium className="w-6 h-6 text-slate-400 mx-auto mb-2" />
+                  <p className="text-sm font-semibold text-slate-700">Company off day</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Nobody marks attendance today and the {board.cutoff} cutoff does not run. Everyone shows as Off.
+                  </p>
+                </div>
+              ) : (
+                <>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {[
+                  { key: 'present', title: 'Present' },
+                  { key: 'not_yet', title: `Not yet marked (until ${board.cutoff})` },
+                  { key: 'absent', title: 'Absent' },
+                ].map((col) => (
+                  <div key={col.key} className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-bold text-slate-900">{col.title}</h3>
+                      <span className="text-xs font-bold text-slate-500">{board[col.key].length}</span>
+                    </div>
+                    {board[col.key].length === 0 ? (
+                      <p className="text-xs text-slate-500 italic py-2">Nobody here.</p>
+                    ) : (
+                      <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                        {board[col.key].map((p) => (
+                          <div key={p.id} className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-100 text-xs">
+                            <div className="min-w-0">
+                              <p className="font-semibold text-slate-900">
+                                {p.first_name} {p.last_name}
+                              </p>
+                              <p className="text-[10px] text-slate-500">
+                                {p.role}
+                                {p.cutoff_absence && (
+                                  <span className="ml-1 text-red-600 font-semibold">
+                                    · {p.absence_reason === 'ADMIN' ? 'absent (set by admin)' : 'cutoff absence'}
+                                  </span>
+                                )}
+                                {p.overridden && p.absence_reason !== 'ADMIN' && (
+                                  <span className="ml-1 text-brand font-semibold">· admin changed</span>
+                                )}
+                              </p>
+                              {p.last_changed_by && (
+                                <p className="text-[10px] text-slate-400 mt-0.5">
+                                  changed by {p.last_changed_by.name} ({p.last_changed_by.email})
+                                  {p.last_changed_at && (
+                                    <> at {new Date(p.last_changed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</>
+                                  )}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                              {p.marked_at && (
+                                <span className="text-[10px] font-semibold text-emerald-700">
+                                  {new Date(p.marked_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              )}
+                              <select
+                                value={p.status}
+                                onChange={(e) => handleSetStatus(p, e.target.value)}
+                                disabled={savingStatus === p.id}
+                                className="text-[10px] font-semibold bg-white border border-slate-200 rounded px-1 py-0.5 text-slate-700 focus:outline-none focus:ring-1 focus:ring-brand"
+                                title="Admin can change the status"
+                              >
+                                <option value="PRESENT">Present</option>
+                                <option value="ABSENT">Absent</option>
+                                <option value="LEAVE">Leave</option>
+                                <option value="HALF_DAY">Half day</option>
+                              </select>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+                </>
+              )}
+
+              {!board.is_off_day && board.other.length > 0 && (
+                <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                  <h3 className="text-sm font-bold text-slate-900 mb-3">Leave / Half day / Future</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {board.other.map((p) => (
+                      <span
+                        key={p.id}
+                        className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 text-xs font-medium"
+                        title={p.status}
+                      >
+                        {p.first_name} {p.last_name} · {p.status.replace('_', ' ').toLowerCase()}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {/* ── Tab: Off Days ─────────────────────────────────────────────────── */}
       {activeTab === 'offdays' && (
