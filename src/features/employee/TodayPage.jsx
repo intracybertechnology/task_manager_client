@@ -11,6 +11,7 @@ export default function TodayPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [marking, setMarking] = useState(false);
+  const [tab, setTab] = useState('recurring');
 
   const load = async () => {
     try {
@@ -42,9 +43,10 @@ export default function TodayPage() {
 
   if (loading || !data) return <LoadingSkeleton />;
 
-  const all = [...data.recurring, ...data.assigned].sort((a, b) =>
-    String(a.start_time || '99:99').localeCompare(String(b.start_time || '99:99'))
-  );
+  const byTime = (a, b) => String(a.start_time || '99:99').localeCompare(String(b.start_time || '99:99'));
+  const recurring = [...data.recurring].sort(byTime);
+  const assigned = [...data.assigned].sort(byTime);
+  const shown = tab === 'recurring' ? recurring : assigned;
   const pct = data.progress.total ? Math.round((data.progress.done / data.progress.total) * 100) : 0;
 
   return (
@@ -79,19 +81,39 @@ export default function TodayPage() {
         </div>
       </div>
 
-      {all.length === 0 ? (
+      {/* Two tabs: what repeats today, and what was assigned to you. One page, one progress bar. */}
+      <div className="flex border-b border-slate-200">
+        {[
+          { id: 'recurring', label: `Recurring (${recurring.length})`, icon: <Repeat className="w-3.5 h-3.5" /> },
+          { id: 'assigned', label: `New tasks (${assigned.length})`, icon: <User className="w-3.5 h-3.5" /> },
+        ].map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`flex items-center gap-1.5 px-5 py-3 text-xs font-semibold border-b-2 transition ${
+              tab === t.id ? 'border-brand text-brand' : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            {t.icon}{t.label}
+          </button>
+        ))}
+      </div>
+
+      {shown.length === 0 ? (
         <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-12 text-center">
           <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-3" />
-          <p className="text-sm text-slate-600 font-medium">Nothing scheduled for today.</p>
-          <p className="text-xs text-slate-500 mt-1">Tasks dated today — recurring or assigned — appear here.</p>
+          <p className="text-sm text-slate-600 font-medium">
+            {tab === 'recurring' ? 'No recurring tasks today.' : 'Nothing assigned to you right now.'}
+          </p>
+          <p className="text-xs text-slate-500 mt-1">
+            {tab === 'recurring'
+              ? 'Recurring tasks for today appear here when they are generated.'
+              : 'Assigned tasks stay on this list until they are completed.'}
+          </p>
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm divide-y divide-slate-100">
-          {all.map((t) => {
-            const source = taskSource(
-              { task_type: t.source === 'recurring' ? 'RECURRING' : 'ONE_OFF', auto_generated: t.source === 'recurring' },
-              t.frequency
-            );
+          {shown.map((t) => {
             return (
               <Link
                 key={t.assignment_id}
@@ -102,19 +124,31 @@ export default function TodayPage() {
                   <p className="text-xs font-bold text-slate-900">{t.start_time || '—'}</p>
                   <p className="text-[10px] text-slate-400">{t.end_time || ''}</p>
                 </div>
-                <div className={`w-0.5 rounded ${t.source === 'recurring' ? 'bg-violet-300' : 'bg-brand/40'}`} />
+                <div className={`w-0.5 rounded ${tab === 'recurring' ? 'bg-violet-300' : t.overdue || t.missed ? 'bg-red-400' : 'bg-brand/40'}`} />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-slate-900 truncate">{t.title}</p>
-                  <p className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
-                    {t.source === 'recurring' ? <Repeat className="w-3 h-3" /> : <User className="w-3 h-3" />}
-                    {t.source === 'recurring' ? `Recurring${t.frequency ? ' · ' + t.frequency.toLowerCase() : ''}` : `Assigned${t.assigned_by ? ' by ' + t.assigned_by : ''}`}
+                  <p className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5 flex-wrap">
+                    {tab === 'recurring' ? <Repeat className="w-3 h-3" /> : <User className="w-3 h-3" />}
+                    {tab === 'recurring'
+                      ? `Recurring${t.frequency ? ' · ' + t.frequency.toLowerCase() : ''}`
+                      : `Assigned${t.assigned_by ? ' by ' + t.assigned_by : ''}`}
+                    {t.due_date && (
+                      <span className={t.overdue ? 'text-red-600 font-semibold' : ''}>
+                        · due {t.due_date}{t.overdue ? ' (overdue)' : ''}
+                      </span>
+                    )}
                   </p>
                 </div>
-                <span className={`self-center text-[10px] font-bold px-2 py-0.5 rounded flex-shrink-0 ${
-                  t.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' : t.status === 'MISSED' ? 'bg-red-100 text-red-700' : t.status === 'IN_PROGRESS' ? 'bg-brand-light text-brand-dark' : 'bg-slate-100 text-slate-600'
-                }`}>
-                  {t.status.replace('_', ' ')}
-                </span>
+                <div className="self-center flex flex-col items-end gap-1 flex-shrink-0">
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                    t.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' : t.status === 'MISSED' ? 'bg-red-100 text-red-700' : t.status === 'IN_PROGRESS' ? 'bg-brand-light text-brand-dark' : 'bg-slate-100 text-slate-600'
+                  }`}>
+                    {t.status.replace('_', ' ')}
+                  </span>
+                  {(t.overdue || t.missed) && t.status !== 'COMPLETED' && (
+                    <span className="text-[9px] font-bold text-red-600">⚠ attention</span>
+                  )}
+                </div>
               </Link>
             );
           })}

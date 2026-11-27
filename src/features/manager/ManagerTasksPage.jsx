@@ -45,6 +45,7 @@ export default function ManagerTasksPage() {
     priority: 'MEDIUM',
     start_date: '',
     due_date: '',
+    task_date: '',
     estimated_minutes: 120,
     assignee_ids: [],
   });
@@ -114,6 +115,7 @@ export default function ManagerTasksPage() {
         ...formData,
         project_id: formData.project_id || null,
         start_date: formData.start_date || null,
+        task_date: formData.task_date || null,
         due_date: formData.due_date || null,
         estimated_minutes: formData.estimated_minutes
           ? parseInt(formData.estimated_minutes, 10)
@@ -128,6 +130,7 @@ export default function ManagerTasksPage() {
         priority: 'MEDIUM',
         start_date: '',
         due_date: '',
+        task_date: '',
         estimated_minutes: 120,
         assignee_ids: [],
       });
@@ -452,6 +455,23 @@ export default function ManagerTasksPage() {
                     <option value="URGENT">Urgent</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Which day this task belongs to. Optional on purpose: with no date
+                  it stays on the assignee's Today list until completed. */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Task Date <span className="text-slate-400 normal-case font-normal">(when should this be done?)</span>
+                </label>
+                <input
+                  type="date"
+                  value={formData.task_date}
+                  onChange={(e) => setFormData({ ...formData, task_date: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-brand"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Leave empty to keep it on their Today list until completed.
+                </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
