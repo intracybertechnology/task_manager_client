@@ -150,6 +150,7 @@ export const templateApi = {
   create: (data) => api.post('/task-templates', data),
   update: (id, data) => api.patch(`/task-templates/${id}`, data),
   deactivate: (id) => api.delete(`/task-templates/${id}`),
+  start: (id, createToday = false) => api.post(`/task-templates/${id}/start`, { create_today: createToday }),
   generate: (date) => api.post('/task-templates/generate', { date }),
 };
 

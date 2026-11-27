@@ -20,22 +20,61 @@ const emptyForm = {
   department_id: '',
   frequency: 'DAILY',
   weekdays: [],
+  day_rule: 'NTH',
   day_of_month: 1,
   start_time: '09:00',
   duration_minutes: 60,
   priority: 'MEDIUM',
   assignee_mode: 'DEPARTMENT',
   members: [],
+  create_today: false,
 };
 
-const describeFrequency = (t) =>
-  t.frequency === 'DAILY'
-    ? 'Every day'
-    : t.frequency === 'WEEKLY'
-    ? t.weekdays.length
+const describeFrequency = (t) => {
+  if (t.frequency === 'DAILY') return 'Every day';
+  if (t.frequency === 'WEEKLY') {
+    return t.weekdays.length
       ? 'Every ' + t.weekdays.map((d) => DAYS.find((x) => x.v === d)?.l).join(', ')
-      : 'Every day'
-    : `Day ${t.day_of_month} of each month`;
+      : 'Every day';
+  }
+  // Monthly: be honest about the short months.
+  if (t.day_rule === 'LAST' || Number(t.day_of_month) >= 31) return 'Last day of each month';
+  const day = Number(t.day_of_month);
+  if (day === 30) return 'Day 30 of each month (not February)';
+  if (day === 29) return 'Day 29 of each month (February only in leap years)';
+  return `Day ${day} of each month`;
+};
+
+// The same month-length logic the server uses, so the preview cannot disagree.
+const daysInMonth = (year, month /* 1-12 */) => new Date(Date.UTC(year, month, 0)).getUTCDate();
+
+// Next `count` dates this template would run on, from today.
+const nextRuns = (form, count = 6) => {
+  const out = [];
+  const d = new Date();
+  d.setHours(12, 0, 0, 0);
+  for (let i = 0; i < 400 && out.length < count; i++) {
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    let runs = false;
+    if (form.frequency === 'DAILY') runs = true;
+    else if (form.frequency === 'WEEKLY') {
+      const wd = d.getDay();
+      runs = form.weekdays.length === 0 || form.weekdays.map(Number).includes(wd);
+    } else {
+      const dom = d.getDate();
+      const dim = daysInMonth(d.getFullYear(), d.getMonth() + 1);
+      if (form.day_rule === 'LAST') runs = dom === dim;
+      else if (Number(form.day_of_month) >= 31) runs = dom === dim;
+      else runs = dom === Number(form.day_of_month);
+    }
+    if (runs) out.push(iso);
+    d.setDate(d.getDate() + 1);
+  }
+  return out;
+};
+
+const prettyDate = (iso) =>
+  new Date(`${iso}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 
 export default function RecurringTemplatesPage() {
   const [templates, setTemplates] = useState([]);
@@ -87,6 +126,7 @@ export default function RecurringTemplatesPage() {
       department_id: t.department_id || '',
       frequency: t.frequency,
       weekdays: Array.isArray(t.weekdays) ? t.weekdays : [],
+      day_rule: t.day_rule || (Number(t.day_of_month) >= 31 ? 'LAST' : 'NTH'),
       day_of_month: t.day_of_month || 1,
       start_time: t.start_time,
       duration_minutes: t.duration_minutes,
@@ -117,18 +157,34 @@ export default function RecurringTemplatesPage() {
       const payload = {
         ...form,
         department_id: form.department_id || null,
-        day_of_month: Number(form.day_of_month),
+        day_rule: form.frequency === 'MONTHLY' ? form.day_rule : null,
+        day_of_month: form.frequency === 'MONTHLY' && form.day_rule === 'NTH' ? Number(form.day_of_month) : null,
         duration_minutes: Number(form.duration_minutes),
       };
-      if (editingId) await templateApi.update(editingId, payload);
-      else await templateApi.create(payload);
-      notify.success(editingId ? 'Template updated.' : 'Template created.');
+      const res = editingId ? await templateApi.update(editingId, payload) : await templateApi.create(payload);
+
+      // Tell the admin exactly what happened, using the server's own account of it.
+      const r = res.data?.create_today_result;
+      if (r && r.today_created > 0) notify.success(r.today_detail);
+      else notify.success(editingId ? 'Template updated. Existing tasks are unchanged.' : `Template saved. ${r?.today_detail || ''}`.trim());
+
       setShowModal(false);
       await load();
     } catch (err) {
       notify.error(err.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const startTemplate = async (t) => {
+    if (!(await confirmDialog(`Start "${t.title}" again? It will create tasks from its next due day.`))) return;
+    try {
+      await templateApi.start(t.id, false);
+      notify.success('Template started.');
+      await load();
+    } catch (err) {
+      notify.error(err.message);
     }
   };
 
@@ -227,9 +283,13 @@ export default function RecurringTemplatesPage() {
                     </td>
                     <td className="py-3 px-4 text-right space-x-2">
                       <button onClick={() => openEdit(t)} className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 font-semibold">Edit</button>
-                      {t.is_active && (
+                      {t.is_active ? (
                         <button onClick={() => deactivate(t)} className="px-2.5 py-1 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 font-semibold">
                           <Power className="w-3 h-3 inline" /> Stop
+                        </button>
+                      ) : (
+                        <button onClick={() => startTemplate(t)} className="px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-lg hover:bg-emerald-100 font-semibold">
+                          <Play className="w-3 h-3 inline" /> Start
                         </button>
                       )}
                     </td>
@@ -305,8 +365,63 @@ export default function RecurringTemplatesPage() {
 
               {form.frequency === 'MONTHLY' && (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Day of month (31 = last day)</label>
-                  <input type="number" min={1} max={31} value={form.day_of_month} onChange={(e) => setForm({ ...form, day_of_month: e.target.value })} className={`${input} w-24`} />
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Day of month</label>
+                  <select
+                    value={form.day_rule === 'LAST' ? 'LAST' : String(form.day_of_month)}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === 'LAST') setForm({ ...form, day_rule: 'LAST' });
+                      else setForm({ ...form, day_rule: 'NTH', day_of_month: Number(v) });
+                    }}
+                    className={`${input} w-56`}
+                  >
+                    {[1, 5, 10, 15, 20, 25].map((d) => <option key={d} value={d}>{d}{d === 1 ? 'st' : d === 5 || d === 25 ? 'th' : 'th'}</option>)}
+                    <option value={29}>29th (Feb only in leap years)</option>
+                    <option value={30}>30th (February skipped)</option>
+                    <option value="LAST">Last day of the month</option>
+                  </select>
+                  <p className={`text-[10px] mt-1 ${form.day_rule === 'LAST' ? 'text-emerald-700' : Number(form.day_of_month) >= 29 ? 'text-amber-700' : 'text-slate-500'}`}>
+                    {form.day_rule === 'LAST'
+                      ? 'Runs on the last day of every month (28 or 29 in February).'
+                      : Number(form.day_of_month) >= 29
+                      ? `⚠ Months without a ${form.day_of_month}th are skipped. Choose "Last day" to avoid gaps.`
+                      : `Runs on the ${form.day_of_month}th of every month.`}
+                  </p>
+                </div>
+              )}
+
+              {/* Next runs: the same rule the server uses, shown before saving */}
+              <div className="bg-brand-light/50 border border-brand-light rounded-xl p-3">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-brand-dark mb-1">Next runs</p>
+                <p className="text-[11px] text-brand-dark">
+                  {nextRuns(form, 4).map(prettyDate).join(' · ')}
+                </p>
+                <p className="text-[10px] text-brand-dark/70 mt-0.5">Company off days are skipped when tasks are created.</p>
+              </div>
+
+              {/* Start from today: only offered when it could actually work */}
+              {!editingId && (
+                <div className="border border-slate-200 rounded-xl p-3 bg-slate-50">
+                  <label className="flex items-start gap-2 text-xs text-slate-800">
+                    <input
+                      type="checkbox"
+                      checked={!!form.create_today}
+                      onChange={(e) => setForm({ ...form, create_today: e.target.checked })}
+                      className="mt-0.5 w-4 h-4 accent-brand"
+                    />
+                    <span>
+                      <span className="font-semibold">Also create today's tasks now</span>
+                      <span className="block text-[10px] text-slate-500">
+                        Creates today's copy for everyone this template applies to, and notifies them.
+                        If left unticked, this template starts from its next due day.
+                      </span>
+                    </span>
+                  </label>
+                  {form.create_today && (
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      If today's slot has passed, or today is an off day, nothing is created and the reason is shown after saving.
+                    </p>
+                  )}
                 </div>
               )}
 
