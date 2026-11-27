@@ -44,6 +44,27 @@ export default {
           foreground: "hsl(var(--card-foreground, 222.2 84% 4.9%))",
         },
       },
+      keyframes: {
+        // One small jump when a notification arrives, then it settles.
+        belljump: {
+          '0%': { transform: 'translateY(0) rotate(0deg)' },
+          '15%': { transform: 'translateY(-6px) rotate(-12deg)' },
+          '30%': { transform: 'translateY(0) rotate(10deg)' },
+          '45%': { transform: 'translateY(-3px) rotate(-6deg)' },
+          '60%': { transform: 'translateY(0) rotate(0deg)' },
+          '100%': { transform: 'translateY(0) rotate(0deg)' },
+        },
+        // The unread badge flashes twice so a change is noticeable even when
+        // the jump happens while the user is looking elsewhere.
+        badgeflash: {
+          '0%, 100%': { backgroundColor: '#ef4444', transform: 'scale(1)' },
+          '50%': { backgroundColor: '#f59e0b', transform: 'scale(1.25)' },
+        },
+      },
+      animation: {
+        belljump: 'belljump 0.9s ease-in-out 1',
+        badgeflash: 'badgeflash 0.45s ease-in-out 3',
+      },
     },
   },
   plugins: [],

@@ -1,6 +1,7 @@
 import { Modal } from '../../components/ui/dialog';
 import { notify, LoadingSkeleton } from '../../components/ui/feedback';
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { taskApi, managerApi, adminApi, projectApi } from '../../lib/api';
 import { formatMinutes } from '../../lib/utils';
@@ -21,6 +22,7 @@ import {
 export default function ManagerTasksPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [tasks, setTasks] = useState([]);
   const [assignableEmployees, setAssignableEmployees] = useState([]);
@@ -77,6 +79,22 @@ export default function ManagerTasksPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  // A notification can arrive as ?open=<task_id>: open that task's details.
+  useEffect(() => {
+    const openId = searchParams.get('open');
+    if (!openId) return;
+    (async () => {
+      try {
+        const res = await taskApi.getById(openId);
+        setSelectedTask(res.data);
+      } catch (err) {
+        notify.error(err.message);
+      } finally {
+        setSearchParams({}, { replace: true });
+      }
+    })();
+  }, [searchParams, setSearchParams]);
 
   const handleCreateTask = async (e) => {
     e.preventDefault();

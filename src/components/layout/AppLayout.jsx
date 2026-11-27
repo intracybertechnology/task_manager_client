@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { notify } from '../ui/feedback';
 import { Modal } from '../ui/dialog';
 import AttendanceMarkButton from '../ui/attendance-mark-button';
+import NotificationBell from '../ui/notification-bell';
 import {
   CheckSquare,
   Clock,
@@ -453,7 +454,11 @@ export default function AppLayout() {
             <Menu className="w-5 h-5" />
           </button>
           <img src="/taiqon-logo.png" alt="Taiqon Technologies" className="h-8 w-auto bg-white rounded p-0.5" />
-          <span className="font-semibold text-sm truncate">Worklog Pro</span>
+          <span className="font-semibold text-sm truncate flex-1">Worklog Pro</span>
+          {/* The desktop header is hidden on phones, so the bell has to be here too. */}
+          <div className="text-slate-200">
+            <NotificationBell />
+          </div>
         </div>
 
         {/* Top Header */}
@@ -475,6 +480,7 @@ export default function AppLayout() {
 
           <div className="flex items-center gap-2 min-w-0">
             <AttendanceMarkButton />
+            <NotificationBell />
             <span className="hidden md:inline text-xs text-slate-500">Signed in as:</span>
             <span className="text-xs font-semibold text-slate-800 truncate">{user?.email}</span>
           </div>

@@ -1,6 +1,7 @@
 import { Modal } from '../../components/ui/dialog';
 import { notify, LoadingSkeleton } from '../../components/ui/feedback';
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { taskApi } from '../../lib/api';
 import { formatMinutes, localDateStr } from '../../lib/utils';
 import {
@@ -13,11 +14,13 @@ import {
   Send,
   Calendar,
   Layers,
+  UserPlus,
 } from 'lucide-react';
 
 const STATUS_OPTIONS = ['TODO', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETED'];
 
 export default function MyTasksPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -40,6 +43,15 @@ export default function MyTasksPage() {
   useEffect(() => {
     fetchTasks();
   }, []);
+
+  // A notification can arrive as ?open=<task_id>: open that task's details.
+  useEffect(() => {
+    const openId = searchParams.get('open');
+    if (!openId || tasks.length === 0) return;
+    const match = tasks.find((t) => t.task?.id === openId);
+    if (match) setSelectedTask(match);
+    setSearchParams({}, { replace: true });
+  }, [tasks, searchParams, setSearchParams]);
 
   const handleStatusChange = async (assignmentId, newStatus) => {
     try {
@@ -200,6 +212,16 @@ export default function MyTasksPage() {
                   </p>
 
                   <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap gap-y-2 text-xs text-slate-500">
+                    <div className="w-full flex items-center gap-1.5">
+                      <UserPlus className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span className="truncate">
+                        Assigned by{' '}
+                        <span className="font-semibold text-slate-700">
+                          {item.assigned_by?.first_name || task.creator?.first_name}{' '}
+                          {item.assigned_by?.last_name || task.creator?.last_name}
+                        </span>
+                      </span>
+                    </div>
                     {task.project && (
                       <div className="w-full flex items-center gap-1.5 text-brand font-medium truncate">
                         <Layers className="w-3.5 h-3.5 flex-shrink-0" />
@@ -277,8 +299,17 @@ export default function MyTasksPage() {
                 </div>
                 <h2 className="text-xl font-bold text-slate-900">{selectedTask.task.title}</h2>
                 <p className="text-xs text-slate-500 mt-1">
-                  Assigned by {selectedTask.task.creator?.first_name}{' '}
-                  {selectedTask.task.creator?.last_name}
+                  {/* The assigner of this assignment, which can differ from the task creator. */}
+                  Assigned by {selectedTask.assigned_by?.first_name || selectedTask.task.creator?.first_name}{' '}
+                  {selectedTask.assigned_by?.last_name || selectedTask.task.creator?.last_name}
+                  {selectedTask.assigned_by &&
+                    selectedTask.task.creator &&
+                    selectedTask.assigned_by.id !== selectedTask.task.creator.id && (
+                      <span className="text-slate-400">
+                        {' '}· created by {selectedTask.task.creator.first_name}{' '}
+                        {selectedTask.task.creator.last_name}
+                      </span>
+                    )}
                 </p>
               </div>
               <button

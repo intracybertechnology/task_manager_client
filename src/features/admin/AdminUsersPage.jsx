@@ -90,17 +90,12 @@ export default function AdminUsersPage() {
   const openTeamMapping = async (manager) => {
     setSelectedManager(manager);
     try {
-      const res = await adminApi.getUsers(); // refresh
-      // find managed employee ids
-      const team = manager.managedEmployees || [];
-      // or fetch directly
-      const mData = await fetch(`http://localhost:5000/api/v1/users/${manager.id}/team`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-      }).then((r) => r.json());
-      setManagerTeamIds(mData.data ? mData.data.map((m) => m.id) : []);
+      const res = await adminApi.getManagerTeam(manager.id);
+      setManagerTeamIds((res.data || []).map((m) => m.id));
       setShowTeamModal(true);
     } catch (err) {
-      console.error(err);
+      notify.error(err.message);
+      setManagerTeamIds([]);
       setShowTeamModal(true);
     }
   };

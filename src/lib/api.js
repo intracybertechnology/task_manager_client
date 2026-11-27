@@ -94,6 +94,7 @@ export const adminApi = {
     api.post(`/users/${id}/reset-password`, { new_password }),
   setManagerTeam: (managerId, employee_ids) =>
     api.post(`/users/${managerId}/team`, { employee_ids }),
+  getManagerTeam: (managerId) => api.get(`/users/${managerId}/team`),
   getDepartments: () => api.get('/departments'),
   createDepartment: (data) => api.post('/departments', data),
 };
@@ -122,6 +123,15 @@ export const attendanceApi = {
   getExceptions: (params) => api.get('/attendance/exceptions', { params }),
   markException: (data) => api.post('/attendance/exceptions', data),
   removeException: (id) => api.delete(`/attendance/exceptions/${id}`),
+};
+
+export const notificationApi = {
+  list: (params) => api.get('/notifications', { params }),
+  unreadCount: () => api.get('/notifications/unread-count'),
+  markRead: (id) => api.patch(`/notifications/${id}/read`),
+  markAllRead: () => api.post('/notifications/read-all'),
+  dismiss: (id) => api.delete(`/notifications/${id}`),
+  clearRead: () => api.post('/notifications/clear-read'),
 };
 
 export default api;

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { CheckCircle, AlertTriangle, XCircle, X } from 'lucide-react';
+import { CheckCircle, AlertTriangle, XCircle, X, Bell } from 'lucide-react';
 import { Modal } from './dialog';
 
 let toasts = [];
@@ -24,6 +24,7 @@ const pushToast = (type, message) => {
 export const notify = {
   success: (message) => pushToast('success', message),
   error: (message) => pushToast('error', message),
+  info: (message) => pushToast('info', message),
 };
 
 export const confirmDialog = (message) =>
@@ -74,11 +75,17 @@ export function FeedbackProvider({ children }) {
             key={t.id}
             role="status"
             className={`pointer-events-auto flex items-start gap-3 p-3 rounded-xl border shadow-lg bg-white text-xs ${
-              t.type === 'success' ? 'border-emerald-200' : 'border-red-200'
+              t.type === 'success'
+                ? 'border-emerald-200'
+                : t.type === 'info'
+                ? 'border-brand-light'
+                : 'border-red-200'
             }`}
           >
             {t.type === 'success' ? (
               <CheckCircle className="w-4 h-4 mt-0.5 text-emerald-600 flex-shrink-0" />
+            ) : t.type === 'info' ? (
+              <Bell className="w-4 h-4 mt-0.5 text-brand flex-shrink-0" />
             ) : (
               <XCircle className="w-4 h-4 mt-0.5 text-red-600 flex-shrink-0" />
             )}
