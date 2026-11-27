@@ -21,6 +21,8 @@ import {
   Tags,
   ChevronDown,
   ChevronUp,
+  Repeat,
+  AlertTriangle,
 } from 'lucide-react';
 
 export default function AppLayout() {
@@ -387,6 +389,32 @@ export default function AppLayout() {
               >
                 <Clock className="w-4 h-4" />
                 Attendance & Off Days
+              </NavLink>
+              <NavLink
+                to="/admin/recurring"
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition ${
+                    isActive
+                      ? 'bg-brand text-white font-semibold shadow-sm'
+                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  }`
+                }
+              >
+                <Repeat className="w-4 h-4" />
+                Recurring Tasks
+              </NavLink>
+              <NavLink
+                to="/admin/missed"
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition ${
+                    isActive
+                      ? 'bg-brand text-white font-semibold shadow-sm'
+                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  }`
+                }
+              >
+                <AlertTriangle className="w-4 h-4" />
+                Missed Tasks
               </NavLink>
               <NavLink
                 to="/admin/audit-logs"

@@ -21,6 +21,7 @@ const STATUS_COLORS = {
   ON_HOLD: 'bg-amber-100 text-amber-700',
   COMPLETED: 'bg-emerald-100 text-emerald-700',
   CANCELLED: 'bg-red-100 text-red-600',
+  MISSED: 'bg-red-100 text-red-700',
 };
 
 export default function AdminUserOverviewPage() {

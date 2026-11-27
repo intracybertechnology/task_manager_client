@@ -28,6 +28,8 @@ import AdminSubmissionTimelinePage from '../features/admin/AdminSubmissionTimeli
 import AdminUserOverviewPage from '../features/admin/AdminUserOverviewPage';
 import AdminAttendancePage from '../features/admin/AdminAttendancePage';
 import AdminCategoriesPage from '../features/admin/AdminCategoriesPage';
+import RecurringTemplatesPage from '../features/admin/RecurringTemplatesPage';
+import AdminMissedTasksPage from '../features/admin/AdminMissedTasksPage';
 
 function ProtectedRoute({ allowedRoles, children }) {
   const { user, loading } = useAuth();
@@ -197,6 +199,22 @@ export default function AppRoutes() {
           element={
             <ProtectedRoute allowedRoles={['ADMIN']}>
               <AdminAttendancePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="admin/missed"
+          element={
+            <ProtectedRoute allowedRoles={['ADMIN']}>
+              <AdminMissedTasksPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="admin/recurring"
+          element={
+            <ProtectedRoute allowedRoles={['ADMIN']}>
+              <RecurringTemplatesPage />
             </ProtectedRoute>
           }
         />

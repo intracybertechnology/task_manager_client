@@ -6,6 +6,7 @@ import { localDateStr } from '../../lib/utils';
 import {
   CalendarDays,
   CalendarCheck,
+  Clock,
   Plus,
   Trash2,
   X,
@@ -14,6 +15,7 @@ import {
   SunMedium,
   UserX,
 } from 'lucide-react';
+import WorkScheduleEditor from './work-schedule-editor';
 
 const localDateStrUtil = localDateStr;
 
@@ -268,6 +270,7 @@ export default function AdminAttendancePage() {
           { id: 'today', label: "Today's Attendance", icon: <CalendarCheck className="w-4 h-4" /> },
           { id: 'offdays', label: 'Company Off Days', icon: <SunMedium className="w-4 h-4" /> },
           { id: 'absences', label: 'Individual Absences', icon: <UserX className="w-4 h-4" /> },
+          { id: 'schedule', label: 'Work Schedule', icon: <Clock className="w-4 h-4" /> },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -433,6 +436,9 @@ export default function AdminAttendancePage() {
           )}
         </div>
       )}
+
+      {/* ── Tab: Work Schedule ────────────────────────────────────────────── */}
+      {activeTab === 'schedule' && <WorkScheduleEditor />}
 
       {/* ── Tab: Off Days ─────────────────────────────────────────────────── */}
       {activeTab === 'offdays' && (

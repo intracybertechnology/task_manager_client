@@ -37,6 +37,8 @@ export default function DailyWorklogPage() {
   const [editingEntryId, setEditingEntryId] = useState(null);
   const [autoNotices, setAutoNotices] = useState([]);
   const [reminder, setReminder] = useState(null);
+  const [prefill, setPrefill] = useState(null);
+  const [prefilling, setPrefilling] = useState(false);
 
   // Modals & submission state
   const [submitting, setSubmitting] = useState(false);
@@ -56,6 +58,8 @@ export default function DailyWorklogPage() {
       ]);
 
       setReminder(reminderRes.data);
+      // Today's completed tasks, offered as entries to add (never added silently).
+      worklogApi.getPrefill().then((p) => setPrefill(p.data)).catch(() => {});
       setReport(todayReport.data);
       setCategories(cats.data);
       setMyTasks(tasks.data);
@@ -122,6 +126,37 @@ export default function DailyWorklogPage() {
     setDurationMinutes(entry.duration_minutes);
     setFormError('');
     document.getElementById('worklog-entry-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  // Pre-fill: add today's completed tasks as entries, one by one through the
+  // normal addEntry endpoint so every worklog rule still applies.
+  const handlePrefillAll = async () => {
+    const suggestions = (prefill?.suggested_entries || []).filter((s) => !s.already_logged);
+    if (suggestions.length === 0) return;
+    const ok = await confirmDialog(
+      `Add ${suggestions.length} entr${suggestions.length === 1 ? 'y' : 'ies'} from today's completed tasks? You can edit them as normal.`
+    );
+    if (!ok) return;
+    try {
+      setPrefilling(true);
+      for (const s of suggestions) {
+        await worklogApi.addEntry(report.id, {
+          category_id: selectedCategoryId,
+          description: s.title,
+          duration_minutes: s.suggested_duration_minutes,
+          task_id: s.task_id,
+          project_id: null,
+        });
+      }
+      const [updated, p] = await Promise.all([worklogApi.getReportById(report.id), worklogApi.getPrefill()]);
+      setReport(updated.data);
+      setPrefill(p.data);
+      notify.success(`Added ${suggestions.length} entr${suggestions.length === 1 ? 'y' : 'ies'} from today's tasks.`);
+    } catch (err) {
+      notify.error(err.message);
+    } finally {
+      setPrefilling(false);
+    }
   };
 
   const handleSaveEntry = async (e) => {
@@ -204,6 +239,32 @@ export default function DailyWorklogPage() {
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       <SubmitReminder reminder={reminder} />
+
+      {/* Pre-fill from today's completed tasks */}
+      {prefill && (prefill.suggested_entries?.length > 0 || prefill.unfinished?.length > 0) && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-2">
+          {prefill.suggested_entries?.length > 0 && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <p className="text-xs text-slate-700">
+                <span className="font-semibold">{prefill.suggested_entries.length} completed task{prefill.suggested_entries.length === 1 ? '' : 's'} today</span>{' '}
+                can be added as worklog entries.
+              </p>
+              <button
+                onClick={handlePrefillAll}
+                disabled={prefilling}
+                className="px-3 py-1.5 bg-brand hover:bg-brand-dark text-white rounded-lg text-xs font-semibold disabled:opacity-50"
+              >
+                {prefilling ? 'Adding…' : 'Add from completed tasks'}
+              </button>
+            </div>
+          )}
+          {prefill.unfinished?.length > 0 && (
+            <p className="text-[11px] text-slate-500">
+              Still unfinished today: {prefill.unfinished.map((u) => u.title).join(', ')}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Top Banner / Status Card */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">

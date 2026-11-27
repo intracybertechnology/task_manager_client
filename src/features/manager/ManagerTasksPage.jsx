@@ -3,7 +3,7 @@ import { notify, LoadingSkeleton } from '../../components/ui/feedback';
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { taskApi, managerApi, adminApi, projectApi } from '../../lib/api';
+import { taskApi, managerApi, adminApi, projectApi, libraryApi } from '../../lib/api';
 import { formatMinutes } from '../../lib/utils';
 import {
   Plus,
@@ -27,6 +27,7 @@ export default function ManagerTasksPage() {
   const [tasks, setTasks] = useState([]);
   const [assignableEmployees, setAssignableEmployees] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [library, setLibrary] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Filter & Search
@@ -69,6 +70,8 @@ export default function ManagerTasksPage() {
       setAssignableEmployees(available);
 
       setProjects(projRes.data);
+      // Saved library tasks: picking one pre-fills the form.
+      libraryApi.list().then((r) => setLibrary(r.data || [])).catch(() => {});
     } catch (err) {
       console.error(err);
     } finally {
@@ -368,6 +371,29 @@ export default function ManagerTasksPage() {
                 <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
                   Task Title *
                 </label>
+                {library.length > 0 && (
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      const item = library.find((l) => l.id === e.target.value);
+                      if (!item) return;
+                      setFormData((prev) => ({
+                        ...prev,
+                        title: item.title,
+                        description: item.description || prev.description,
+                        project_id: item.project_id || prev.project_id,
+                        priority: item.priority || prev.priority,
+                        estimated_minutes: item.estimated_minutes || prev.estimated_minutes,
+                      }));
+                    }}
+                    className="w-full mb-1.5 px-3 py-2 bg-brand-light/60 border border-brand-light rounded-lg text-xs text-brand-dark font-medium focus:outline-none focus:ring-1 focus:ring-brand"
+                  >
+                    <option value="">Use a saved task from the library…</option>
+                    {library.map((l) => (
+                      <option key={l.id} value={l.id}>{l.title}</option>
+                    ))}
+                  </select>
+                )}
                 <input
                   type="text"
                   required

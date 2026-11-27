@@ -52,6 +52,8 @@ export const taskApi = {
   update: (id, data) => api.patch(`/tasks/${id}`, data),
   updateStatus: (assigneeId, status, note) =>
     api.patch(`/tasks/assignments/${assigneeId}/status`, { status, note }),
+  editAssignmentTime: (assigneeId, data) => api.patch(`/tasks/assignments/${assigneeId}/time`, data),
+  getTimeHistory: (taskId) => api.get(`/tasks/time-history/${taskId}`),
   addAssignees: (id, employee_ids) => api.post(`/tasks/${id}/assignees`, { employee_ids }),
   removeAssignee: (id, assigneeId) => api.delete(`/tasks/${id}/assignees/${assigneeId}`),
   addComment: (id, comment, task_assignee_id) =>
@@ -63,6 +65,7 @@ export const worklogApi = {
   createCategory: (data) => api.post('/worklogs/categories', data),
   updateCategory: (id, data) => api.patch(`/worklogs/categories/${id}`, data),
   getTodayDraft: () => api.get('/worklogs/today'),
+  getPrefill: () => api.get('/worklogs/prefill'),
   getReminder: () => api.get('/worklogs/reminder'),
   getMyReports: (params) => api.get('/worklogs/my-reports', { params }),
   getReportById: (id) => api.get(`/worklogs/reports/${id}`),
@@ -132,6 +135,34 @@ export const notificationApi = {
   markAllRead: () => api.post('/notifications/read-all'),
   dismiss: (id) => api.delete(`/notifications/${id}`),
   clearRead: () => api.post('/notifications/clear-read'),
+};
+
+export const scheduleApi = {
+  get: () => api.get('/work-schedule'),
+  save: (data) => api.put('/work-schedule', data),
+  previewEnd: (start, minutes) => api.get('/work-schedule/preview', { params: { start, minutes } }),
+};
+
+export const templateApi = {
+  list: () => api.get('/task-templates'),
+  get: (id) => api.get(`/task-templates/${id}`),
+  create: (data) => api.post('/task-templates', data),
+  update: (id, data) => api.patch(`/task-templates/${id}`, data),
+  deactivate: (id) => api.delete(`/task-templates/${id}`),
+  generate: (date) => api.post('/task-templates/generate', { date }),
+};
+
+export const missedApi = {
+  summary: (date) => api.get('/missed', { params: date ? { date } : {} }),
+  run: (date) => api.post('/missed/run', { date }),
+  reassign: (assigneeId, data) => api.post(`/missed/${assigneeId}/reassign`, data),
+};
+
+export const libraryApi = {
+  list: () => api.get('/task-library'),
+  create: (data) => api.post('/task-library', data),
+  update: (id, data) => api.patch(`/task-library/${id}`, data),
+  deactivate: (id) => api.delete(`/task-library/${id}`),
 };
 
 export default api;

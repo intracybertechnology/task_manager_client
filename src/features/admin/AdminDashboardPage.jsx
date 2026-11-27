@@ -2,6 +2,7 @@ import { LoadingSkeleton } from '../../components/ui/feedback';
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { adminApi } from '../../lib/api';
+import { createSocket, onDashboardChange } from '../../lib/socket';
 import { formatMinutes, localDateStr, localDateOffset } from '../../lib/utils';
 import {
   Users,
@@ -37,6 +38,34 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     fetchStats(trackDate);
+  }, [trackDate]);
+
+  // Live updates: when something changes, re-read the dashboard (no loading flash).
+  const [live, setLive] = useState(false);
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return undefined;
+    const socket = createSocket(token);
+    socket.on('connect', () => setLive(true));
+    socket.on('disconnect', () => setLive(false));
+    let t = null;
+    const off = onDashboardChange(socket, () => {
+      // Coalesce bursts of events into one refresh.
+      clearTimeout(t);
+      t = setTimeout(async () => {
+        try {
+          const res = await adminApi.getDashboard({ date: trackDate });
+          setStats(res.data);
+        } catch {
+          /* keep the last good view */
+        }
+      }, 400);
+    });
+    return () => {
+      clearTimeout(t);
+      off();
+      socket.disconnect();
+    };
   }, [trackDate]);
 
   if (loading) {
@@ -87,6 +116,15 @@ export default function AdminDashboardPage() {
           >
             All Worklogs
           </Link>
+          <span
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold border ${
+              live ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'
+            }`}
+            title={live ? 'Updating live' : 'Live updates disconnected'}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${live ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+            {live ? 'LIVE' : 'OFFLINE'}
+          </span>
         </div>
       </div>
 
@@ -316,6 +354,70 @@ export default function AdminDashboardPage() {
               </p>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Monitoring: completion by department + templates running today */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+          <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
+            <CheckSquare className="w-4 h-4 text-brand" /> Task Completion by Department
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+              {stats?.submission_date}
+            </span>
+          </h3>
+          {(stats?.completion_by_department || []).length === 0 ? (
+            <p className="text-xs text-slate-500 italic">No dated tasks for this date.</p>
+          ) : (
+            <div className="space-y-3">
+              {stats.completion_by_department.map((d) => (
+                <div key={d.department}>
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="font-semibold text-slate-800">{d.department}</span>
+                    <span className="text-slate-500">
+                      <span className="font-bold text-slate-800">{d.done}</span>/{d.total} done · {d.percent}%
+                    </span>
+                  </div>
+                  <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-500" style={{ width: `${d.percent}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+          <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
+            <CalendarDays className="w-4 h-4 text-brand" /> Templates Running Today
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+              {stats?.templates_today?.date}
+            </span>
+          </h3>
+          {(stats?.templates_today?.templates || []).length === 0 ? (
+            <p className="text-xs text-slate-500 italic">No recurring templates are active today.</p>
+          ) : (
+            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+              {stats.templates_today.templates.map((t) => (
+                <div key={t.id} className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-between text-xs">
+                  <div>
+                    <p className="font-semibold text-slate-900">{t.title}</p>
+                    <p className="text-[10px] text-slate-500">{t.start_time} · {t.duration_minutes}m · {t.frequency.toLowerCase()}</p>
+                  </div>
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                      t.generated ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                    }`}
+                  >
+                    {t.generated ? `${t.done}/${t.assignments} done` : 'not generated yet'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          <Link to="/admin/recurring" className="text-[11px] font-semibold text-brand hover:text-brand-dark mt-3 inline-block">
+            Manage recurring tasks →
+          </Link>
         </div>
       </div>
 

@@ -32,3 +32,26 @@ export function localDateOffset(days) {
   d.setDate(d.getDate() + days);
   return localDateStr(d);
 }
+
+// How a task came to this person. Used everywhere so the wording is identical.
+//   recurring  -> from a repeating template (created by a job, not a person)
+//   reassigned -> created because an earlier task was missed
+//   assigned   -> someone gave it to them directly
+export function taskSource(task, frequency) {
+  if (!task) return { key: 'assigned', label: 'Assigned', detail: '' };
+  if (task.reassigned_from) {
+    return { key: 'reassigned', label: 'Reassigned', detail: 'Moved here after being missed.' };
+  }
+  if (task.task_type === 'RECURRING' || task.auto_generated) {
+    const label = frequency
+      ? String(frequency).charAt(0) + String(frequency).slice(1).toLowerCase()
+      : 'Recurring';
+    return {
+      key: 'recurring',
+      label,
+      detail: 'Part of a repeating template. Time changes apply to this day only.',
+    };
+  }
+  return { key: 'assigned', label: 'Assigned', detail: '' };
+}
+

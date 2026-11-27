@@ -11,3 +11,11 @@ export const createSocket = (token) =>
     transports: ['websocket', 'polling'],
     autoConnect: true,
   });
+
+// Subscribes to dashboard change signals and returns an unsubscribe function.
+// Only fires for admins (the server puts them in the 'admins' room).
+export const onDashboardChange = (socket, handler) => {
+  const events = ['dashboard:task', 'dashboard:attendance'];
+  events.forEach((e) => socket.on(e, handler));
+  return () => events.forEach((e) => socket.off(e, handler));
+};

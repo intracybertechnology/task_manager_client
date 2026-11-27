@@ -3,7 +3,8 @@ import { notify, LoadingSkeleton } from '../../components/ui/feedback';
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { taskApi } from '../../lib/api';
-import { formatMinutes, localDateStr } from '../../lib/utils';
+import TaskTimeEditor from '../../components/ui/task-time-editor';
+import { formatMinutes, localDateStr, taskSource } from '../../lib/utils';
 import {
   CheckCircle2,
   Clock,
@@ -117,6 +118,8 @@ export default function MyTasksPage() {
         return 'bg-brand-light text-brand-dark border-brand-light';
       case 'ON_HOLD':
         return 'bg-amber-100 text-amber-800 border-amber-200';
+      case 'MISSED':
+        return 'bg-red-100 text-red-700 border-red-200';
       default:
         return 'bg-slate-100 text-slate-800 border-slate-200';
     }
@@ -163,6 +166,30 @@ export default function MyTasksPage() {
         </div>
       </div>
 
+      {/* Today's progress: how many of today's tasks are done.
+          Cancelled tasks are excluded from the count. */}
+      {(() => {
+        const today = localDateStr();
+        const todays = tasks.filter((t) => t.task?.task_date === today);
+        const countable = todays.filter((t) => t.assignment_status !== 'CANCELLED');
+        const done = countable.filter((t) => t.assignment_status === 'COMPLETED').length;
+        if (countable.length === 0) return null;
+        const pct = Math.round((done / countable.length) * 100);
+        return (
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+            <div className="flex items-center justify-between text-xs mb-2">
+              <span className="font-semibold text-slate-800">Today's progress</span>
+              <span className="text-slate-500">
+                <span className="font-bold text-slate-900">{done}</span> of {countable.length} done
+              </span>
+            </div>
+            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div className={`h-full rounded-full transition-all ${pct === 100 ? 'bg-emerald-500' : 'bg-brand'}`} style={{ width: `${pct}%` }} />
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Task Cards Grid */}
       {loading ? (
         <LoadingSkeleton />
@@ -176,6 +203,7 @@ export default function MyTasksPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredTasks.map((item) => {
             const task = item.task;
+            const source = taskSource(task, task.template?.frequency);
             const isOverdue =
               item.assignment_status !== 'COMPLETED' &&
               task.due_date &&
@@ -188,13 +216,15 @@ export default function MyTasksPage() {
               >
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-2">
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded border ${getPriorityBadge(
-                        task.priority
-                      )}`}
-                    >
-                      {task.priority}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded border ${getPriorityBadge(
+                          task.priority
+                        )}`}
+                      >
+                        {task.priority}
+                      </span>
+                    </div>
                     <span
                       className={`text-[10px] font-bold px-2 py-0.5 rounded border ${getStatusBadge(
                         item.assignment_status
@@ -207,6 +237,27 @@ export default function MyTasksPage() {
                   <h3 className="font-semibold text-slate-800 text-base leading-snug line-clamp-2">
                     {task.title}
                   </h3>
+                  {/* Source chip: is this a repeating template task, a reassigned one, or a person's assignment? */}
+                  <div className="flex items-center gap-1.5 mt-1.5">
+                    <span
+                      title={source.detail || undefined}
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                        source.key === 'recurring'
+                          ? 'bg-violet-50 text-violet-700 border-violet-200'
+                          : source.key === 'reassigned'
+                          ? 'bg-orange-50 text-orange-700 border-orange-200'
+                          : 'bg-slate-50 text-slate-600 border-slate-200'
+                      }`}
+                    >
+                      {source.key === 'recurring' ? '↻ ' : source.key === 'reassigned' ? '↺ ' : ''}
+                      {source.label}
+                    </span>
+                    {source.key === 'assigned' && (
+                      <span className="text-[10px] text-slate-500 truncate">
+                        by {item.assigned_by?.first_name || task.creator?.first_name || '—'}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-slate-500 mt-1 line-clamp-3 leading-relaxed">
                     {task.description}
                   </p>
@@ -353,6 +404,21 @@ export default function MyTasksPage() {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Scheduled time: shown, and editable by the assignee */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                  Scheduled Time
+                </h4>
+                <TaskTimeEditor
+                  assignment={selectedTask}
+                  onSaved={async () => {
+                    const updated = await taskApi.getById(selectedTask.task.id);
+                    setSelectedTask((prev) => ({ ...prev, task: updated.data }));
+                    await fetchTasks();
+                  }}
+                />
               </div>
 
               {/* Discussion & Comments */}
