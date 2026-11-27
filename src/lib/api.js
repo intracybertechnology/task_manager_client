@@ -47,6 +47,7 @@ export const authApi = {
 export const taskApi = {
   list: (params) => api.get('/tasks', { params }),
   myTasks: (params) => api.get('/tasks/my-tasks', { params }),
+  myToday: () => api.get('/tasks/my-today'),
   getById: (id) => api.get(`/tasks/${id}`),
   create: (data) => api.post('/tasks', data),
   update: (id, data) => api.patch(`/tasks/${id}`, data),

@@ -11,6 +11,7 @@ import AppLayout from '../components/layout/AppLayout';
 import MyTasksPage from '../features/employee/MyTasksPage';
 import DailyWorklogPage from '../features/employee/DailyWorklogPage';
 import SubmittedReportsPage from '../features/employee/SubmittedReportsPage';
+import TodayPage from '../features/employee/TodayPage';
 
 // Manager & Admin Tasks
 import ManagerDashboardPage from '../features/manager/ManagerDashboardPage';
@@ -99,6 +100,22 @@ export default function AppRoutes() {
           element={
             <ProtectedRoute allowedRoles={['EMPLOYEE']}>
               <DailyWorklogPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="employee/today"
+          element={
+            <ProtectedRoute allowedRoles={['EMPLOYEE', 'MANAGER']}>
+              <TodayPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="manager/today"
+          element={
+            <ProtectedRoute allowedRoles={['MANAGER']}>
+              <TodayPage />
             </ProtectedRoute>
           }
         />

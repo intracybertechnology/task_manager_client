@@ -5,6 +5,7 @@ import { notify } from '../ui/feedback';
 import { Modal } from '../ui/dialog';
 import AttendanceMarkButton from '../ui/attendance-mark-button';
 import NotificationBell from '../ui/notification-bell';
+import DayStartPopup from '../ui/day-start-popup';
 import {
   CheckSquare,
   Clock,
@@ -23,6 +24,7 @@ import {
   ChevronUp,
   Repeat,
   AlertTriangle,
+  Sun,
 } from 'lucide-react';
 
 export default function AppLayout() {
@@ -102,6 +104,8 @@ export default function AppLayout() {
 
   return (
     <div className="fixed inset-0 flex bg-slate-50 overflow-hidden">
+      {/* Login popup: today's tasks, once per day, employees and managers only. */}
+      {(user?.role === 'EMPLOYEE' || user?.role === 'MANAGER') && <DayStartPopup />}
       {secondsLeft !== null && (
         <Modal open onOpenChange={(o) => { if (!o) stayActive(); }}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 border border-slate-100 text-center">
@@ -176,6 +180,19 @@ export default function AppLayout() {
               <div className="px-3 pt-2 pb-1 text-[11px] font-semibold tracking-wider text-slate-500 uppercase">
                 My Workspace
               </div>
+              <NavLink
+                to="/employee/today"
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition ${
+                    isActive
+                      ? 'bg-brand text-white font-semibold shadow-sm'
+                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  }`
+                }
+              >
+                <Sun className="w-4 h-4" />
+                Today
+              </NavLink>
               <NavLink
                 to="/employee/tasks"
                 className={({ isActive }) =>
