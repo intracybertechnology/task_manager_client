@@ -1,17 +1,32 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { taskApi, attendanceApi } from '../../lib/api';
 import { notify, LoadingSkeleton } from '../../components/ui/feedback';
-import { taskSource } from '../../lib/utils';
 import { Clock, Repeat, User, CalendarCheck, CheckCircle2 } from 'lucide-react';
 
 // The Today tab: a timeline of today's tasks, recurring and assigned, with
-// progress. Status is changed in the task itself, not here.
+// progress. Status is changed per row with the same dropdown used everywhere;
+// clicking elsewhere on a row opens the task.
+const STATUS_OPTIONS = ['TODO', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETED'];
+
+const statusClass = (status) =>
+  status === 'COMPLETED'
+    ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+    : status === 'MISSED'
+    ? 'bg-red-100 text-red-700 border-red-200'
+    : status === 'IN_PROGRESS'
+    ? 'bg-brand-light text-brand-dark border-brand-light'
+    : status === 'ON_HOLD'
+    ? 'bg-amber-100 text-amber-800 border-amber-200'
+    : 'bg-slate-100 text-slate-600 border-slate-200';
+
 export default function TodayPage() {
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [marking, setMarking] = useState(false);
   const [tab, setTab] = useState('recurring');
+  const [savingId, setSavingId] = useState(null);
 
   const load = async () => {
     try {
@@ -38,6 +53,32 @@ export default function TodayPage() {
       notify.error(err.message);
     } finally {
       setMarking(false);
+    }
+  };
+
+  // Optimistic status change: the row updates immediately, and is put back if
+  // the server refuses, so the screen never claims something that did not happen.
+  const changeStatus = async (task, status) => {
+    if (status === task.status) return;
+    const previous = task.status;
+    setSavingId(task.assignment_id);
+    setData((d) => ({
+      ...d,
+      recurring: d.recurring.map((t) => (t.assignment_id === task.assignment_id ? { ...t, status } : t)),
+      assigned: d.assigned.map((t) => (t.assignment_id === task.assignment_id ? { ...t, status } : t)),
+    }));
+    try {
+      await taskApi.updateStatus(task.assignment_id, status, 'Changed from Today list');
+      await load(); // re-read progress and any server-side effects
+    } catch (err) {
+      notify.error(err.message);
+      setData((d) => ({
+        ...d,
+        recurring: d.recurring.map((t) => (t.assignment_id === task.assignment_id ? { ...t, status: previous } : t)),
+        assigned: d.assigned.map((t) => (t.assignment_id === task.assignment_id ? { ...t, status: previous } : t)),
+      }));
+    } finally {
+      setSavingId(null);
     }
   };
 
@@ -113,50 +154,63 @@ export default function TodayPage() {
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm divide-y divide-slate-100">
-          {shown.map((t) => {
-            return (
-              <Link
-                key={t.assignment_id}
-                to={`/employee/tasks?open=${t.task_id}`}
-                className="flex items-stretch gap-4 p-4 hover:bg-slate-50 transition"
-              >
-                <div className="w-16 flex-shrink-0 text-right">
-                  <p className="text-xs font-bold text-slate-900">{t.start_time || '—'}</p>
-                  <p className="text-[10px] text-slate-400">{t.end_time || ''}</p>
-                </div>
-                <div className={`w-0.5 rounded ${tab === 'recurring' ? 'bg-violet-300' : t.overdue || t.missed ? 'bg-red-400' : 'bg-brand/40'}`} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-900 truncate">{t.title}</p>
-                  <p className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5 flex-wrap">
-                    {tab === 'recurring' ? <Repeat className="w-3 h-3" /> : <User className="w-3 h-3" />}
-                    {tab === 'recurring'
-                      ? `Recurring${t.frequency ? ' · ' + t.frequency.toLowerCase() : ''}`
-                      : `Assigned${t.assigned_by ? ' by ' + t.assigned_by : ''}`}
-                    {t.due_date && (
-                      <span className={t.overdue ? 'text-red-600 font-semibold' : ''}>
-                        · due {t.due_date}{t.overdue ? ' (overdue)' : ''}
-                      </span>
-                    )}
-                  </p>
-                </div>
-                <div className="self-center flex flex-col items-end gap-1 flex-shrink-0">
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                    t.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' : t.status === 'MISSED' ? 'bg-red-100 text-red-700' : t.status === 'IN_PROGRESS' ? 'bg-brand-light text-brand-dark' : 'bg-slate-100 text-slate-600'
-                  }`}>
-                    {t.status.replace('_', ' ')}
-                  </span>
+          {shown.map((t) => (
+            <div
+              key={t.assignment_id}
+              onClick={() => navigate(`/employee/tasks?open=${t.task_id}`)}
+              className={`flex items-stretch gap-4 p-4 hover:bg-slate-50 transition cursor-pointer ${
+                t.status === 'COMPLETED' ? 'bg-emerald-50/40' : ''
+              }`}
+            >
+              <div className="w-16 flex-shrink-0 text-right">
+                <p className="text-xs font-bold text-slate-900">{t.start_time || '—'}</p>
+                <p className="text-[10px] text-slate-400">{t.end_time || ''}</p>
+              </div>
+              <div className={`w-0.5 rounded ${tab === 'recurring' ? 'bg-violet-300' : t.overdue || t.missed ? 'bg-red-400' : 'bg-brand/40'}`} />
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm font-semibold truncate ${t.status === 'COMPLETED' ? 'text-slate-500 line-through' : 'text-slate-900'}`}>
+                  {t.title}
+                </p>
+                <p className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5 flex-wrap">
+                  {tab === 'recurring' ? <Repeat className="w-3 h-3" /> : <User className="w-3 h-3" />}
+                  {tab === 'recurring'
+                    ? `Recurring${t.frequency ? ' · ' + t.frequency.toLowerCase() : ''}`
+                    : `Assigned${t.assigned_by ? ' by ' + t.assigned_by : ''}`}
+                  {t.due_date && (
+                    <span className={t.overdue ? 'text-red-600 font-semibold' : ''}>
+                      · due {t.due_date}{t.overdue ? ' (overdue)' : ''}
+                    </span>
+                  )}
                   {(t.overdue || t.missed) && t.status !== 'COMPLETED' && (
                     <span className="text-[9px] font-bold text-red-600">⚠ attention</span>
                   )}
-                </div>
-              </Link>
-            );
-          })}
+                </p>
+              </div>
+              {/* Status dropdown: the same control used on My Tasks. Stops the row
+                  click so changing status never opens the task. */}
+              <div className="self-center flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                <select
+                  value={t.status}
+                  disabled={savingId === t.assignment_id || t.status === 'CANCELLED'}
+                  onChange={(e) => changeStatus(t, e.target.value)}
+                  title={t.status === 'MISSED' ? 'Missed at the cutoff — you can still mark it done now.' : 'Change status'}
+                  className={`text-[10px] font-bold px-2 py-1 rounded-lg border focus:outline-none focus:ring-1 focus:ring-brand disabled:opacity-70 ${statusClass(t.status)}`}
+                >
+                  {/* MISSED has no option of its own: it is a past fact, not a choice.
+                      It stays visible until the person picks a real status. */}
+                  {t.status === 'MISSED' && <option value="MISSED" disabled>MISSED</option>}
+                  {STATUS_OPTIONS.map((s) => (
+                    <option key={s} value={s}>{s.replace('_', ' ')}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
       <p className="text-[11px] text-slate-500 flex items-center gap-1">
-        <Clock className="w-3 h-3" /> Open a task to change its status.
+        <Clock className="w-3 h-3" /> Change status here, or click a row to open the task.
       </p>
     </div>
   );
